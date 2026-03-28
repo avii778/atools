@@ -3,6 +3,8 @@
 #include <chrono>
 #include <cstdint>
 #include <iostream>
+#include <math.h>
+#include <numeric>
 #include <ostream>
 #include <poll.h>
 #include <stdio.h>
@@ -10,6 +12,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <vector>
 #define MAXSIZE 512
 
 int64_t get_network_timestamp() {
@@ -17,6 +20,22 @@ int64_t get_network_timestamp() {
     auto now = std::chrono::system_clock::now();
     auto duration = now.time_since_epoch();
     return std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+}
+
+int64_t std_dev(const std::vector<int64_t>& vec) {
+
+    int64_t mean = std::accumulate(vec.begin(), vec.end(), 0.0);
+
+    int64_t var;
+    for (int64_t x : vec) {
+
+        var += (x - mean) * (x - mean);
+    }
+
+    var /= vec.size();
+
+    // could microptimize into heron's method
+    return std::sqrt(var);
 }
 
 int main() {
@@ -49,10 +68,17 @@ int main() {
     struct pollfd pollfds[1];
     pollfds[0].fd = fd;
     pollfds[0].events = POLLIN;
+
     int64_t min_latency = std::numeric_limits<int64_t>::max();
     int64_t max_latency = -1;
     int64_t total_latency = 0;
     int64_t latency;
+
+    std::vector<int64_t> arrivals;
+    arrivals.reserve(1000);
+    arrivals.push_back(get_network_timestamp());
+    std::vector<int64_t> deltas;
+    deltas.reserve(1000);
 
     while (true) {
 
@@ -68,9 +94,14 @@ int main() {
         }
 
         int n = recvfrom(fd, (char*)d, sizeof(int64_t) * 2, 0, (struct sockaddr*)&client_addr, &a);
+        latency = get_network_timestamp() - d[1];
+
+        arrivals.push_back(d[1]);
+
+        deltas.push_back(arrivals.back() - arrivals[arrivals.size() - 2]);
+
         if (d[0] == cur_packet + 1) {
             cur_packet = d[0];
-            latency = get_network_timestamp() - d[1];
 
             total_latency += latency;
             min_latency = std::min(latency, min_latency);
@@ -84,7 +115,6 @@ int main() {
             dropped_packets += d[0] - cur_packet - 1;
             cur_packet = d[0];
 
-            latency = get_network_timestamp() - d[1];
             total_latency += latency;
             min_latency = std::min(latency, min_latency);
             max_latency = std::max(max_latency, latency);
@@ -103,6 +133,7 @@ int main() {
     std::cout << "avg latency " << total_latency / 1000 << std::endl;
     std::cout << "min latency " << min_latency << std::endl;
     std::cout << "max latency " << max_latency << std::endl;
+    std::cout << "jitter (std deviation of arrival deltas) " << std_dev(deltas) << std::endl;
 
     return 0;
 }
