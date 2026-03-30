@@ -52,11 +52,12 @@ int main() {
         int num_read = 0;
         uint16_t packet[256] = {0};
 
-        while (int n = read(STDIN_FILENO, (uint8_t*)packet + num_read, sizeof(packet) - num_read)) {
+        while (int n = read(STDIN_FILENO, (uint8_t*)packet + num_read, sizeof(packet) - num_read) &&
+                       num_read < sizeof(packet)) {
             num_read += n; // how many bytes i just read
         }
 
-        if (num_read < 256) {
+        if (num_read < 512) {
             b = 1;
         }
 
