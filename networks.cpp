@@ -2,6 +2,8 @@
 #include <arpa/inet.h>
 #include <chrono>
 #include <cstdint>
+#include <cstring>
+#include <fstream>
 #include <iostream>
 #include <math.h>
 #include <numeric>
@@ -41,7 +43,7 @@ int64_t std_dev(const std::vector<int64_t>& vec) {
 int main() {
 
     int fd = socket(AF_INET, SOCK_DGRAM, 0);
-
+    std::ofstream file("log.txt");
     int val = 1;
     setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
     struct sockaddr_in addr = {};
@@ -56,8 +58,6 @@ int main() {
         close(fd);
         return -1;
     }
-
-    std::cout << "im doing smth" << std::endl;
 
     char buf[MAXSIZE] = {'\0'};
     int64_t cur_packet = -1;
@@ -85,7 +85,7 @@ int main() {
         struct sockaddr_in client_addr;
         socklen_t a = sizeof(client_addr);
 
-        int64_t d[2];
+        uint8_t d[2 * sizeof(int) + sizeof(int64_t) + 4068]; // HAHHAHAHAHAHAHAHAHA
         int r = poll(pollfds, 1, 5000);
 
         if (r == 0) {
@@ -93,47 +93,59 @@ int main() {
             break;
         }
 
-        int n = recvfrom(fd, (char*)d, sizeof(int64_t) * 2, 0, (struct sockaddr*)&client_addr, &a);
-        latency = get_network_timestamp() - d[1];
+        int n = recvfrom(fd, (char*)d, sizeof(d), 0, (struct sockaddr*)&client_addr, &a);
+        int size;
+        memcpy(&size, d, sizeof(int));
 
-        arrivals.push_back(d[1]);
+        int num_packet;
+        memcpy(&num_packet, d + sizeof(int), sizeof(int));
+
+        int64_t timestamp;
+        memcpy(&timestamp, d + 2 * sizeof(int), sizeof(int64_t));
+
+        latency = get_network_timestamp() - timestamp;
+
+        arrivals.push_back(timestamp);
 
         deltas.push_back(arrivals.back() - arrivals[arrivals.size() - 2]);
 
-        if (d[0] == cur_packet + 1) {
-            cur_packet = d[0];
+        if (num_packet == cur_packet + 1) {
+            cur_packet = num_packet;
 
             total_latency += latency;
             min_latency = std::min(latency, min_latency);
             max_latency = std::max(latency, max_latency);
+
+            write(STDOUT_FILENO, d + 2 * (sizeof(int)) + sizeof(int64_t), size);
         }
 
-        else if (d[1] > cur_packet + 1) {
+        else if (num_packet > cur_packet + 1) {
             std::cout << std::dec;
-            std::cout << "I just dropped packets from " << cur_packet << " to " << d[0]
-                      << std::endl;
-            dropped_packets += d[0] - cur_packet - 1;
-            cur_packet = d[0];
+            file << "I just dropped packets from " << cur_packet << " to " << num_packet
+                 << std::endl;
+            dropped_packets += num_packet - cur_packet - 1;
+            cur_packet = num_packet;
 
             total_latency += latency;
             min_latency = std::min(latency, min_latency);
             max_latency = std::max(max_latency, latency);
+
+            write(STDOUT_FILENO, d + 2 * (sizeof(int)) + sizeof(int64_t), size);
         }
 
         else {
-            std::cout << std::dec;
-            std::cout << "Recieved packet " << d << "Out of order" << std::endl;
+            file << std::dec;
+            file << "Recieved packet " << num_packet << "Out of order" << std::endl;
         }
         std::cout << std::dec;
-        std::cout << "On packet " << cur_packet << std::endl;
+        file << "On packet " << cur_packet << std::endl;
     }
 
-    dropped_packets += 1000 - cur_packet;
-    std::cout << "dropped packets " << dropped_packets << std::endl;
-    std::cout << "avg latency " << total_latency / 1000 << std::endl;
-    std::cout << "min latency " << min_latency << std::endl;
-    std::cout << "max latency " << max_latency << std::endl;
-    std::cout << "jitter (std deviation of arrival deltas) " << std_dev(deltas) << std::endl;
+    file << "dropped packets " << dropped_packets << std::endl;
+    file << "avg latency " << total_latency / 1000 << std::endl;
+    file << "min latency " << min_latency << std::endl;
+    file << "max latency " << max_latency << std::endl;
+    file << "jitter (std deviation of arrival deltas) " << std_dev(deltas) << std::endl;
 
     return 0;
 }

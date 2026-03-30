@@ -2,6 +2,7 @@
 #include <asm-generic/socket.h>
 #include <chrono>
 #include <cstdint>
+#include <cstring>
 #include <netinet/in.h>
 #include <stdio.h>
 #include <sys/socket.h>
@@ -34,11 +35,40 @@ int main() {
         return -1;
     }
 
-    for (int i = 0; i < 1000; i++) {
-        int64_t buf[2];
-        buf[0] = (int64_t)i;
-        buf[1] = get_network_timestamp();
-        int g = send(fd, (const char*)buf, sizeof(int64_t) * 2, 0);
+    // hmm maybe make it (size)(num_packet)(latency)(packet)
+    int i = 0;
+    int b;
+    while (true) {
+
+        b = 0;
+
+        // 256 packets should be fine (256 * 16)
+        uint8_t buf[2 * sizeof(int) + sizeof(int64_t) + 4068];
+        memcpy(buf + sizeof(int), &i, sizeof(int));
+        int64_t time = get_network_timestamp();
+        memcpy(buf + 2 * sizeof(int), &time, sizeof(int64_t));
+
+        // try to read the 256 audio packets
+        int num_read = 0;
+        uint16_t packet[256] = {0};
+
+        while (int n = read(STDIN_FILENO, (uint8_t*)packet + num_read, sizeof(packet) - num_read)) {
+            num_read += n; // how many bytes i just read
+        }
+
+        if (num_read < 256) {
+            b = 1;
+        }
+
+        memcpy(buf, &num_read, sizeof(int));
+        memcpy(buf + 2 * sizeof(int) + sizeof(int64_t), packet, sizeof(packet));
+
+        // may god help us all
+        int g = send(fd, (const char*)buf, sizeof(buf), 0);
+        i++;
+        if (b) {
+            break;
+        }
     }
 
     return 0;
