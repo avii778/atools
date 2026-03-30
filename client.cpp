@@ -43,7 +43,7 @@ int main() {
         b = 0;
 
         // 256 packets should be fine (256 * 16)
-        uint8_t buf[2 * sizeof(int) + sizeof(int64_t) + 4068];
+        uint8_t buf[2 * sizeof(int) + sizeof(int64_t) + 512];
         memcpy(buf + sizeof(int), &i, sizeof(int));
         int64_t time = get_network_timestamp();
         memcpy(buf + 2 * sizeof(int), &time, sizeof(int64_t));
@@ -52,9 +52,20 @@ int main() {
         int num_read = 0;
         uint16_t packet[256] = {0};
 
-        while (int n = read(STDIN_FILENO, (uint8_t*)packet + num_read, sizeof(packet) - num_read) &&
-                       num_read < sizeof(packet)) {
-            num_read += n; // how many bytes i just read
+        while (num_read < (int)sizeof(packet)) {
+            int n = read(STDIN_FILENO,
+                (uint8_t*)packet + num_read,
+                 sizeof(packet) - num_read);
+
+            if (n < 0) {
+                perror("read");
+                return 1;
+            }
+            if (n == 0) {
+                break;
+            }
+
+            num_read += n;
         }
 
         if (num_read < 512) {
