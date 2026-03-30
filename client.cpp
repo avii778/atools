@@ -53,14 +53,13 @@ int main() {
         uint16_t packet[256] = {0};
 
         while (num_read < (int)sizeof(packet)) {
-            int n = read(STDIN_FILENO,
-                (uint8_t*)packet + num_read,
-                 sizeof(packet) - num_read);
+            int n = read(STDIN_FILENO, (uint8_t*)packet + num_read, sizeof(packet) - num_read);
 
             if (n < 0) {
                 perror("read");
                 return 1;
             }
+
             if (n == 0) {
                 break;
             }
@@ -68,7 +67,7 @@ int main() {
             num_read += n;
         }
 
-        if (num_read < 512) {
+        if (num_read == 0) {
             b = 1;
         }
 
