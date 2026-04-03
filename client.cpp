@@ -29,8 +29,8 @@ int main() {
     addr.sin_port = htons(1234);
     addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 
-    if (int n = connect(fd, (const struct sockaddr*)&addr, sizeof(addr)) < 0) {
-
+    int n = connect(fd, (const struct sockaddr*)&addr, sizeof(addr));
+    if (n < 0) {
         perror("lol");
         return -1;
     }
@@ -39,7 +39,6 @@ int main() {
     int i = 0;
     int b;
     while (true) {
-
         b = 0;
 
         // 256 packets should be fine (256 * 16)
@@ -64,7 +63,7 @@ int main() {
                 break;
             }
 
-            num_read += n;
+            num_read = n;
         }
 
         if (num_read == 0) {
@@ -73,9 +72,13 @@ int main() {
 
         memcpy(buf, &num_read, sizeof(int));
         memcpy(buf + 2 * sizeof(int) + sizeof(int64_t), packet, sizeof(packet));
-
+        int total = 2 * sizeof(int) + sizeof(int64_t) + num_read;
         // may god help us all
-        int g = send(fd, (const char*)buf, sizeof(buf), 0);
+        int g = send(fd, (const char*)buf, total, 0);
+
+        if (g < 0) {
+            printf("IT WAS ME!");
+        }
         i++;
         if (b) {
             break;

@@ -28,7 +28,7 @@ int64_t std_dev(const std::vector<int64_t>& vec) {
 
     int64_t mean = std::accumulate(vec.begin(), vec.end(), 0.0) / vec.size();
 
-    int64_t var;
+    int64_t var = 0;
     for (int64_t x : vec) {
 
         var += (x - mean) * (x - mean);
@@ -86,7 +86,7 @@ int main() {
         socklen_t a = sizeof(client_addr);
 
         uint8_t d[2 * sizeof(int) + sizeof(int64_t) + 512]; // HAHHAHAHAHAHAHAHAHA
-        int r = poll(pollfds, 1, 5000);
+        int r = poll(pollfds, 1, 10000);
 
         if (r == 0) {
 
@@ -140,9 +140,9 @@ int main() {
         std::cout << std::dec;
         file << "On packet " << cur_packet << std::endl;
     }
-
+    int64_t received_packets = cur_packet + 1 - dropped_packets;
     file << "dropped packets " << dropped_packets << std::endl;
-    file << "avg latency " << total_latency / 1000 << std::endl;
+    file << "avg latency " << total_latency / received_packets << std::endl;
     file << "min latency " << min_latency << std::endl;
     file << "max latency " << max_latency << std::endl;
     file << "jitter (std deviation of arrival deltas) " << std_dev(deltas) << std::endl;
