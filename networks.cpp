@@ -105,7 +105,7 @@ int main() {
 
         latency = get_network_timestamp() - timestamp;
 
-        arrivals.push_back(timestamp);
+        arrivals.push_back(get_network_timestamp());
 
         deltas.push_back(arrivals.back() - arrivals[arrivals.size() - 2]);
 

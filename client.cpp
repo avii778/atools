@@ -63,7 +63,7 @@ int main() {
                 break;
             }
 
-            num_read = n;
+            num_read += n;
         }
 
         if (num_read == 0) {
